@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "WebLante Prototype",
+  "version": "0.1",
+  "permissions": [
+    "tabs",
+    "storage",
+    "webNavigation"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["decision.html", "decision.js", "decision.css"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}

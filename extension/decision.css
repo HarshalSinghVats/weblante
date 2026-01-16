@@ -1,0 +1,78 @@
+* {
+  box-sizing: border-box;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+body {
+  margin: 0;
+  height: 100vh;
+  background: linear-gradient(135deg, #0f172a, #020617);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #e5e7eb;
+}
+
+.card {
+  width: 420px;
+  padding: 32px;
+  background: #020617;
+  border-radius: 16px;
+  border: 1px solid #1e293b;
+  text-align: center;
+}
+
+.logo {
+  font-weight: 600;
+  margin-bottom: 24px;
+  letter-spacing: 0.5px;
+}
+
+.state {
+  animation: fadeIn 0.4s ease;
+}
+
+.hidden {
+  display: none;
+}
+
+.safe {
+  color: #22c55e;
+}
+
+.blocked {
+  color: #ef4444;
+}
+
+.score {
+  margin-top: 12px;
+  font-size: 14px;
+  opacity: 0.8;
+}
+
+.score.low {
+  color: #22c55e;
+}
+
+.score.high {
+  color: #ef4444;
+}
+
+.spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid #334155;
+  border-top-color: #60a5fa;
+  border-radius: 50%;
+  margin: 0 auto 16px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}

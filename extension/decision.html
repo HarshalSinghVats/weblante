@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>SafeBrowse Analysis</title>
+  <link rel="stylesheet" href="decision.css" />
+</head>
+<body>
+  <div class="card">
+    <div class="logo">🛡️ SafeBrowse</div>
+
+    <div id="state-loading" class="state">
+      <div class="spinner"></div>
+      <p>Analyzing website safety…</p>
+      <small>This usually takes a second</small>
+    </div>
+
+    <div id="state-allow" class="state hidden">
+      <h2 class="safe">✅ Website Allowed</h2>
+      <p id="reason-allow"></p>
+      <div class="score low" id="score-allow"></div>
+    </div>
+
+    <div id="state-block" class="state hidden">
+      <h2 class="blocked">🚫 Website Blocked</h2>
+      <p id="reason-block"></p>
+      <div class="score high" id="score-block"></div>
+      <small>This site may contain harmful content</small>
+    </div>
+  </div>
+
+  <script src="decision.js"></script>
+</body>
+</html>
