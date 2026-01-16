@@ -1,13 +1,13 @@
-# 🛡️ SafeBrowse
+# 🛡️ Weblante
 
 **Real-time web safety for kids — intent-based, not just site-based.**
 
-SafeBrowse is a browser extension + backend system that blocks harmful content
+Weblante is a browser extension + backend system that blocks harmful content
 by analyzing **what a user is trying to search**, not just which website they visit.
 
 ---
 
-## 🚨 Why SafeBrowse?
+## 🚨 Why Weblante?
 
 Most filters fail because they:
 - Trust search engines blindly
@@ -15,7 +15,7 @@ Most filters fail because they:
 - Miss obfuscated searches (`p0rn`, `s3x`, `sexvideos`)
 - React after the page loads
 
-SafeBrowse fixes this by detecting **intent** at navigation time.
+Weblante fixes this by detecting **intent** at navigation time.
 
 ---
 
@@ -32,11 +32,11 @@ SafeBrowse fixes this by detecting **intent** at navigation time.
 
 ## 🧠 How It Works
 
-# 🛡️ SafeBrowse
+# 🛡️ Weblante
 
 **Real-time web safety for kids — intent-based, not just site-based.**
 
-SafeBrowse is a browser extension + backend system that blocks harmful content
+Weblante is a browser extension + backend system that blocks harmful content
 by analyzing **what a user is trying to search**, not just which website they visit.
 
 ---
@@ -49,7 +49,7 @@ Most filters fail because they:
 - Miss obfuscated searches (`p0rn`, `s3x`, `sexvideos`)
 - React after the page loads
 
-SafeBrowse fixes this by detecting **intent** at navigation time.
+Weblante fixes this by detecting **intent** at navigation time.
 
 ---
 
