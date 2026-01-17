@@ -107,6 +107,12 @@ export default function ActivityTable() {
 
               <p className="text-xs text-white/80 break-all">{r.url}</p>
 
+              {r.decision === "block" && r.primaryReason && (
+                <p className="text-xs text-red-400 font-semibold">
+                  {r.primaryReason}
+                </p>
+              )}
+
               <div className="flex justify-between text-xs text-white">
                 <span
                   className={`font-semibold ${
@@ -186,6 +192,12 @@ export default function ActivityTable() {
                           <p className="text-xs text-white/70 break-all">
                             {r.url}
                           </p>
+
+                          {r.decision === "block" && r.primaryReason && (
+                            <p className="text-xs text-red-400 font-semibold mt-1">
+                              {r.primaryReason}
+                            </p>
+                          )}
                         </div>
                       </div>
                     </td>
