@@ -104,7 +104,7 @@ export async function decideNavigation(input) {
   // AGE-BASED BLOCK (SESSION)
   if (
     typeof global.CHILD_AGE === "number" &&
-    global.CHILD_AGE < 13 &&
+    global.CHILD_AGE < 16 &&
     isSocialMedia(url)
   ) {
     const decision = {
