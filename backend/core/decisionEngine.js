@@ -8,11 +8,11 @@ import { checkAllowlist } from "../heuristics/allowlist.js";
 import { scanTextSources } from "../analysis/scanTextSources.js";
 import { checkSafeBrowsing } from "../reputation/safeBrowsing.js";
 import { checkUrlPath } from "../heuristics/urlPath.js";
+import { geminiCheck } from "../analysis/geminiCheck.js";
 
 import db from "../firebase.js";
 
 const SAFE_BROWSING_KEY = process.env.SAFE_BROWSING_KEY;
-const KEYWORD_BLOCK_THRESHOLD = 0.6;
 
 const lastSeen = new Map();
 
@@ -39,7 +39,6 @@ function isSocialMedia(url) {
 function isSearchPage(url) {
   try {
     const u = new URL(url);
-
     const SEARCH_PARAMS = [
       "q",
       "query",
@@ -49,22 +48,32 @@ function isSearchPage(url) {
       "k",
       "keyword"
     ];
-
     for (const p of SEARCH_PARAMS) {
       if (u.searchParams.get(p)) return true;
     }
-
     if (
       u.hostname.includes("wikipedia.org") &&
       u.pathname.startsWith("/wiki/")
     ) {
       return true;
     }
-
     return false;
   } catch {
     return false;
   }
+}
+
+function resolveAgePolicy(age) {
+  if (age >= 9 && age <= 12) {
+    return { class: "PRE_TEEN", threshold: 0.4 };
+  }
+  if (age >= 13 && age <= 15) {
+    return { class: "TEEN", threshold: 0.5 };
+  }
+  if (age >= 16 && age <= 17) {
+    return { class: "EARLY_ADULT", threshold: 0.6 };
+  }
+  return null;
 }
 
 async function logActivity({ url, verdict, riskScore, reasons }) {
@@ -84,16 +93,22 @@ async function logActivity({ url, verdict, riskScore, reasons }) {
     durationMs,
     timestamp: now,
     age: global.CHILD_AGE ?? null,
+    ageClass: global.AGE_CLASS ?? null,
     sessionId: global.SESSION_ID ?? null
   });
 }
 
 export async function decideNavigation(input) {
-  const { url } = input;
+  const { url, title = "", description = "", body = "" } = input;
   const isSearch = isSearchPage(url);
 
+  const agePolicy =
+    typeof global.CHILD_AGE === "number"
+      ? resolveAgePolicy(global.CHILD_AGE)
+      : null;
+
   if (
-    typeof global.CHILD_AGE === "number" &&
+    agePolicy &&
     global.CHILD_AGE < 16 &&
     isSocialMedia(url)
   ) {
@@ -159,7 +174,10 @@ export async function decideNavigation(input) {
     return decision;
   }
 
-  if (keywordResult.score >= KEYWORD_BLOCK_THRESHOLD) {
+  if (
+    agePolicy &&
+    keywordResult.score >= agePolicy.threshold
+  ) {
     const decision = {
       verdict: "block",
       riskScore: keywordResult.score,
@@ -168,6 +186,21 @@ export async function decideNavigation(input) {
     await logActivity({ url, ...decision });
     setCachedDecision(url, decision);
     return decision;
+  }
+
+  if (agePolicy) {
+    const geminiVerdict = await geminiCheck(
+      `${title}\n${description}\n${body}`
+    );
+    if (geminiVerdict === "UNSAFE") {
+      const decision = {
+        verdict: "block",
+        riskScore: 0.8,
+        reasons: ["Blocked by AI content moderation"]
+      };
+      await logActivity({ url, ...decision });
+      return decision;
+    }
   }
 
   if (!isSearch) {
