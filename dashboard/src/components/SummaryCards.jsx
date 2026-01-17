@@ -17,18 +17,41 @@ function formatTime(ms) {
   return `${pad(h)} hrs ${pad(m)} min ${pad(sec)} sec`;
 }
 
-function classifyScreenTime(ms) {
-  const hours = ms / (1000 * 60 * 60);
+function getWellbeingAdvice(timeMs, blockedCount) {
+  const hours = timeMs / (1000 * 60 * 60);
 
-  if (hours < 1) {
-    return { label: "Healthy usage", color: "text-green-400" };
+  if (blockedCount >= 8) {
+    return {
+      text: "Repeated blocked attempts detected. Consider discussing safe browsing habits.",
+      color: "text-red-400",
+    };
   }
 
-  if (hours < 3) {
-    return { label: "Moderate usage", color: "text-yellow-400" };
+  if (hours > 3) {
+    return {
+      text: "Excessive screen time today. Recommend immediate breaks.",
+      color: "text-red-400",
+    };
   }
 
-  return { label: "Excessive usage", color: "text-red-400" };
+  if (hours > 2) {
+    return {
+      text: "High screen time today. Consider reducing device usage.",
+      color: "text-yellow-300",
+    };
+  }
+
+  if (hours > 1) {
+    return {
+      text: "Moderate screen time. Encourage breaks and offline activity.",
+      color: "text-yellow-300",
+    };
+  }
+
+  return {
+    text: "All good. Healthy usage today. Check again later.",
+    color: "text-green-400",
+  };
 }
 
 export default function SummaryCards() {
@@ -52,6 +75,8 @@ export default function SummaryCards() {
     return () => unsub();
   }, []);
 
+  const advice = getWellbeingAdvice(time, blocked);
+
   const chartData = {
     datasets: [
       {
@@ -63,11 +88,9 @@ export default function SummaryCards() {
     ],
   };
 
-  const screenTimeStatus = classifyScreenTime(time);
-
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-      {/* Activity Summary */}
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+      {/* Activity */}
       <div className="rounded-2xl bg-white/10 backdrop-blur-xl border border-white/25 p-4 flex items-center justify-between shadow">
         <div>
           <p className="text-xs text-white/70">Activity</p>
@@ -81,16 +104,19 @@ export default function SummaryCards() {
         </div>
       </div>
 
-      {/* Screen Time + Classification */}
+      {/* Screen Time */}
       <div className="rounded-2xl bg-white/10 backdrop-blur-xl border border-white/25 p-4 shadow">
         <p className="text-xs text-white/70">Screen Time (Today)</p>
-
-        <p className="text-lg text-white font-semibold">
+        <p className="text-white font-semibold mt-1">
           {formatTime(time)}
         </p>
+      </div>
 
-        <p className={`text-sm font-medium ${screenTimeStatus.color}`}>
-          {screenTimeStatus.label}
+      {/* Wellbeing Advice */}
+      <div className="rounded-2xl bg-white/10 backdrop-blur-xl border border-white/25 p-4 shadow">
+        <p className="text-xs text-white/70">Wellbeing Advice</p>
+        <p className={`text-sm mt-2 font-medium ${advice.color}`}>
+          {advice.text}
         </p>
       </div>
     </div>
