@@ -16,9 +16,6 @@ const KEYWORD_BLOCK_THRESHOLD = 0.6;
 
 const lastSeen = new Map();
 
-// ─────────────────────────────
-// Social media age restriction
-// ─────────────────────────────
 const SOCIAL_MEDIA_DOMAINS = [
   "instagram.com",
   "facebook.com",
@@ -39,9 +36,6 @@ function isSocialMedia(url) {
   }
 }
 
-// ─────────────────────────────
-// Search detection (universal)
-// ─────────────────────────────
 function isSearchPage(url) {
   try {
     const u = new URL(url);
@@ -73,9 +67,6 @@ function isSearchPage(url) {
   }
 }
 
-// ─────────────────────────────
-// Firebase logging
-// ─────────────────────────────
 async function logActivity({ url, verdict, riskScore, reasons }) {
   const now = Date.now();
 
@@ -90,18 +81,16 @@ async function logActivity({ url, verdict, riskScore, reasons }) {
     reason: reasons.join(", "),
     riskScore,
     durationMs,
-    timestamp: now
+    timestamp: now,
+    age: global.CHILD_AGE ?? null,
+    sessionId: global.SESSION_ID ?? null
   });
 }
 
-// ─────────────────────────────
-// Decision engine
-// ─────────────────────────────
 export async function decideNavigation(input) {
   const { url } = input;
   const isSearch = isSearchPage(url);
 
-  // AGE-BASED BLOCK (SESSION)
   if (
     typeof global.CHILD_AGE === "number" &&
     global.CHILD_AGE < 16 &&

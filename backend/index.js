@@ -1,6 +1,7 @@
 import "dotenv/config";
 import express from "express";
 import readline from "readline";
+import crypto from "crypto";
 import { decideNavigation } from "./core/decisionEngine.js";
 
 const app = express();
@@ -14,10 +15,14 @@ console.log(
 );
 
 // ─────────────────────────────
-// Session-only age (clean order)
+// Session globals
 // ─────────────────────────────
 global.CHILD_AGE = null;
+global.SESSION_ID = crypto.randomUUID();
 
+// ─────────────────────────────
+// Ask age BEFORE server starts
+// ─────────────────────────────
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout
@@ -26,10 +31,12 @@ const rl = readline.createInterface({
 rl.question("Enter child's age for this session: ", (answer) => {
   const age = Number(answer);
   global.CHILD_AGE = isNaN(age) ? null : age;
+
   console.log("Session age set to:", global.CHILD_AGE);
+  console.log("Session ID:", global.SESSION_ID);
+
   rl.close();
 
-  // START SERVER ONLY AFTER AGE IS SET
   app.listen(PORT, () => {
     console.log(`Weblante backend running on http://localhost:${PORT}`);
   });
