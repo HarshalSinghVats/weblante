@@ -8,7 +8,7 @@ import {
   getDocs,
 } from "firebase/firestore";
 import { db } from "../firebase";
-
+//shows number of logs in a page
 const PAGE_SIZE = 10;
 
 function getDomain(url) {
