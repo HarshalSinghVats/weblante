@@ -20,7 +20,7 @@ function formatTime(ms) {
 function getWellbeingAdvice(timeMs, blockedCount) {
   const hours = timeMs / (1000 * 60 * 60);
 
-  if (blockedCount >= 8) {
+  if (blockedCount >= 3) {
     return {
       text: "Repeated blocked attempts detected. Consider discussing safe browsing habits.",
       color: "text-red-400",
