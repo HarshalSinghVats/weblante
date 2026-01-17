@@ -19,6 +19,47 @@ console.log(
 // ─────────────────────────────
 global.CHILD_AGE = null;
 global.SESSION_ID = crypto.randomUUID();
+global.LAST_SEARCH_QUERY = null;
+
+// ─────────────────────────────
+// URL formatter for console logs
+// ─────────────────────────────
+function formatUrlForLog(rawUrl) {
+  try {
+    const u = new URL(rawUrl);
+
+    let host = u.hostname.toLowerCase();
+    if (host.startsWith("www.")) host = host.slice(4);
+
+    const path = u.pathname.toLowerCase();
+
+    const q =
+      u.searchParams.get("q") ||
+      u.searchParams.get("oq") ||
+      u.searchParams.get("as_q") ||
+      u.searchParams.get("search_query") ||
+      u.searchParams.get("k") ||
+      u.searchParams.get("p") ||
+      u.searchParams.get("text") ||
+      u.searchParams.get("wd") ||
+      u.searchParams.get("keywords");
+
+    if (q) {
+      const decoded = decodeURIComponent(q.replace(/\+/g, " "));
+      global.LAST_SEARCH_QUERY = decoded;
+      return `${host}${path}?q=${decoded}`;
+    }
+
+    // No query in URL → show last known search if exists
+    if (global.LAST_SEARCH_QUERY) {
+      return `${host}${path} (last search: ${global.LAST_SEARCH_QUERY})`;
+    }
+
+    return `${host}${path}`;
+  } catch {
+    return String(rawUrl || "").toLowerCase();
+  }
+}
 
 // ─────────────────────────────
 // Ask age BEFORE server starts
@@ -61,7 +102,7 @@ app.post("/analyze", async (req, res) => {
     });
 
     console.log(
-      `[DECISION] ${decision.verdict.toUpperCase()} — ${url}`,
+      `[DECISION] ${decision.verdict.toUpperCase()} — ${formatUrlForLog(url)}`,
       decision.reasons
     );
 

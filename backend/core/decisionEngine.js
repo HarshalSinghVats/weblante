@@ -12,12 +12,14 @@ import { checkSafeBrowsing } from "../reputation/safeBrowsing.js";
 import { checkUrlPath } from "../heuristics/urlPath.js";
 import { geminiCheck } from "../analysis/geminiCheck.js";
 import { fuzzyCheck } from "../analysis/fuzzyCheck.js";
-import { normalizeUrl } from "../utils/normalizeUrl.js";
 
+import fetch from "node-fetch";
 import db from "../firebase.js";
 
 const SAFE_BROWSING_KEY = process.env.SAFE_BROWSING_KEY;
 const lastSeen = new Map();
+
+/* ---------------- CONSTANTS ---------------- */
 
 const SOCIAL_MEDIA_DOMAINS = [
   "instagram.com",
@@ -30,20 +32,20 @@ const SOCIAL_MEDIA_DOMAINS = [
   "tumblr.com"
 ];
 
-function isSocialMedia(normalizedUrl) {
-  return SOCIAL_MEDIA_DOMAINS.some(d => normalizedUrl.includes(d));
-}
+/* ---------------- HELPERS ---------------- */
 
-/* ---------------- SAFE DECODER ---------------- */
+function isSocialMedia(url) {
+  return SOCIAL_MEDIA_DOMAINS.some(d => url.includes(d));
+}
 
 function safeDecode(input, passes = 3) {
   if (!input) return "";
   let out = input;
   for (let i = 0; i < passes; i++) {
     try {
-      const decoded = decodeURIComponent(out.replace(/\+/g, " "));
-      if (decoded === out) break;
-      out = decoded;
+      const d = decodeURIComponent(out.replace(/\+/g, " "));
+      if (d === out) break;
+      out = d;
     } catch {
       break;
     }
@@ -51,33 +53,55 @@ function safeDecode(input, passes = 3) {
   return out;
 }
 
-/* ---------------- SEARCH QUERY EXTRACTION ---------------- */
+function truncateUrlForDecision(rawUrl) {
+  try {
+    const u = new URL(rawUrl);
+
+    let host = u.hostname.toLowerCase();
+    if (host.startsWith("www.")) host = host.slice(4);
+
+    const path = u.pathname.toLowerCase();
+
+    const q =
+      u.searchParams.get("q") ||
+      u.searchParams.get("search_query");
+
+    if (q) {
+      return `${host}${path}?q=${safeDecode(q)}`;
+    }
+
+    return `${host}${path}`;
+  } catch {
+    return String(rawUrl || "").toLowerCase();
+  }
+}
 
 function extractSearchQuery(rawUrl) {
-  const decodedUrl = safeDecode(rawUrl);
+  const decoded = safeDecode(rawUrl);
 
   try {
-    const u = new URL(decodedUrl);
+    const u = new URL(decoded);
+    const PARAMS = [
+      "q",
+      "oq",
+      "as_q",
+      "query",
+      "search",
+      "search_query",
+      "k",
+      "sr",
+      "p",
+      "text",
+      "wd",
+      "keywords"
+    ];
 
-    const SEARCH_PARAMS = ["q", "oq", "as_q", "query", "search"];
-
-    for (const p of SEARCH_PARAMS) {
-      const val = u.searchParams.get(p);
-      if (val) {
-        return safeDecode(val).trim();
-      }
+    for (const p of PARAMS) {
+      const v = u.searchParams.get(p);
+      if (v) return safeDecode(v).trim();
     }
-  } catch {
-    // fall through
-  }
+  } catch {}
 
-  // Regex fallback
-  const match = decodedUrl.match(/(?:q|oq|as_q)=([^&]+)/i);
-  if (match) {
-    return safeDecode(match[1]).trim();
-  }
-
-  // Final fallback: scan raw URL text
   return "";
 }
 
@@ -92,7 +116,13 @@ function resolveAgePolicy(age) {
 
 /* ---------------- LOGGING ---------------- */
 
-async function logActivity({ url, verdict, riskScore, reasons }) {
+async function logActivity({
+  url,
+  verdict,
+  riskScore,
+  reasons,
+  stage
+}) {
   const now = Date.now();
   const sessionKey = global.SESSION_ID || "default";
 
@@ -101,10 +131,12 @@ async function logActivity({ url, verdict, riskScore, reasons }) {
   lastSeen.set(sessionKey, { time: now });
 
   await db.collection("activity").add({
-    url,
+    url: truncateUrlForDecision(url),
     decision: verdict,
-    reason: reasons.join(", "),
     riskScore,
+    reasons,
+    primaryReason: reasons?.[0] ?? null,
+    stage,
     durationMs,
     timestamp: now,
     age: global.CHILD_AGE ?? null,
@@ -113,12 +145,12 @@ async function logActivity({ url, verdict, riskScore, reasons }) {
   });
 }
 
-/* ---------------- MAIN DECISION ENGINE ---------------- */
+/* ================= MAIN ENGINE ================= */
 
 export async function decideNavigation(input) {
+
   const rawUrl = input.url;
-  const url = normalizeUrl(rawUrl);
-  const { title = "", description = "", body = "" } = input;
+  const url = truncateUrlForDecision(rawUrl);
 
   const searchQuery = extractSearchQuery(rawUrl);
   const isSearch = searchQuery.length > 0;
@@ -128,90 +160,72 @@ export async function decideNavigation(input) {
       ? resolveAgePolicy(global.CHILD_AGE)
       : null;
 
-  if (agePolicy) {
-    global.AGE_CLASS = agePolicy.class;
-  }
+  if (agePolicy) global.AGE_CLASS = agePolicy.class;
 
-  /* 🚫 ABSOLUTE EXPLICIT BLOCK — MUST RUN FIRST */
+  /* 🚫 ABSOLUTE EXPLICIT SEARCH */
   if (
     isSearch &&
     /s[\W_]*x|sex|porn|xxx|xvideos|xnxx|hentai|nude|blowjob|fuck/i.test(searchQuery)
   ) {
     const decision = {
       verdict: "block",
-      riskScore: 1.0,
-      reasons: ["Explicit search intent detected"]
+      riskScore: 1,
+      reasons: ["Explicit search intent detected"],
+      stage: "EXPLICIT_SEARCH"
     };
     await logActivity({ url, ...decision });
     return decision;
   }
 
-  /* 0️⃣ AGE-BASED SOCIAL MEDIA BLOCK */
+  /* AGE-BASED SOCIAL MEDIA */
   if (agePolicy && global.CHILD_AGE < 16 && isSocialMedia(url)) {
     const decision = {
       verdict: "block",
       riskScore: 0.9,
-      reasons: ["Blocked by age-based policy"]
+      reasons: ["Blocked by age-based policy"],
+      stage: "AGE_SOCIAL_MEDIA"
     };
     await logActivity({ url, ...decision });
     return decision;
   }
 
-  /* 1️⃣ CACHE (NON-SEARCH ONLY) */
-  if (!isSearch) {
-    const cached = getCachedDecision(url);
-    if (cached) return cached;
-  }
-
-  /* 2️⃣ HARD ADULT DOMAINS */
+  /* ADULT DOMAIN */
   const adultDomainResult = checkAdultDomain(url);
   if (adultDomainResult.hit) {
     const decision = {
       verdict: "block",
-      riskScore: 1.0,
-      reasons: [adultDomainResult.reason]
+      riskScore: 1,
+      reasons: [adultDomainResult.reason],
+      stage: "ADULT_DOMAIN"
     };
     await logActivity({ url, ...decision });
-    setCachedDecision(url, decision);
     return decision;
   }
 
-  /* 3️⃣ SAFE BROWSING */
+  /* SAFE BROWSING */
   const safeResult = await checkSafeBrowsing(url, SAFE_BROWSING_KEY);
   if (safeResult.hit) {
     const decision = {
       verdict: "block",
-      riskScore: 1.0,
-      reasons: [safeResult.reason]
+      riskScore: 1,
+      reasons: [safeResult.reason],
+      stage: "SAFE_BROWSING"
     };
     await logActivity({ url, ...decision });
-    setCachedDecision(url, decision);
     return decision;
   }
 
-  /* 4️⃣ URL PATH HEURISTICS */
-  const pathResult = checkUrlPath(url);
-  if (pathResult.hit) {
-    const decision = {
-      verdict: "block",
-      riskScore: 0.7,
-      reasons: [pathResult.reason]
-    };
-    await logActivity({ url, ...decision });
-    setCachedDecision(url, decision);
-    return decision;
-  }
-
-  /* 5️⃣ KEYWORD ANALYSIS */
+  /* KEYWORD ANALYSIS */
   const keywordResult = isSearch
-    ? scanTextSources({ title, description, body: searchQuery })
+    ? scanTextSources({ body: searchQuery })
     : scanTextSources(input);
 
   if (isSearch && keywordResult.hardBlock) {
     const decision = {
       verdict: "block",
-      riskScore: 1.0,
-      reasons: keywordResult.reasons
+      riskScore: 1,
+      reasons: keywordResult.reasons,
+      stage: "KEYWORD_HARD"
     };
     await logActivity({ url, ...decision });
     return decision;
@@ -221,72 +235,64 @@ export async function decideNavigation(input) {
     const decision = {
       verdict: "block",
       riskScore: keywordResult.score,
-      reasons: keywordResult.reasons
+      reasons: keywordResult.reasons,
+      stage: "KEYWORD_THRESHOLD"
     };
     await logActivity({ url, ...decision });
     return decision;
   }
 
-  /* 6️⃣ FUZZY CHECK */
-  if (
-    isSearch &&
-    agePolicy &&
-    keywordResult.score === 0 &&
-    fuzzyCheck(searchQuery)
-  ) {
+  /* FUZZY */
+  if (isSearch && fuzzyCheck(searchQuery)) {
     const decision = {
       verdict: "block",
       riskScore: 0.55,
-      reasons: ["Obfuscated explicit keyword detected"]
+      reasons: ["Obfuscated explicit keyword detected"],
+      stage: "FUZZY"
     };
     await logActivity({ url, ...decision });
     return decision;
   }
 
-  /* 7️⃣ GEMINI — TRUE LAST RESORT */
+  /* GEMINI */
   if (
     isSearch &&
     agePolicy &&
-    keywordResult.score === 0 &&
-    searchQuery.length > 3 &&
-    !/^(how|what|why|when|where|tips|guide|learn)\b/i.test(searchQuery)
+    searchQuery.length > 3
   ) {
-    const verdict = await geminiCheck(
-      searchQuery,
-      agePolicy.class
-    );
-
+    const verdict = await geminiCheck(searchQuery, agePolicy.class);
     if (verdict === "UNSAFE") {
       const decision = {
         verdict: "block",
         riskScore: 0.8,
-        reasons: ["Blocked by AI content moderation"]
+        reasons: ["Blocked by AI content moderation"],
+        stage: "GEMINI"
       };
       await logActivity({ url, ...decision });
       return decision;
     }
   }
 
-  /* 8️⃣ ALLOWLIST (NON-SEARCH) */
-  if (!isSearch) {
-    const allowResult = checkAllowlist(url);
-    if (allowResult.hit) {
-      const decision = {
-        verdict: "allow",
-        riskScore: 0,
-        reasons: [allowResult.reason]
-      };
-      await logActivity({ url, ...decision });
-      setCachedDecision(url, decision);
-      return decision;
-    }
+  /* ALLOWLIST */
+  const allowResult = checkAllowlist(url);
+  if (allowResult.hit) {
+    const decision = {
+      verdict: "allow",
+      riskScore: 0,
+      reasons: [allowResult.reason],
+      stage: "ALLOWLIST"
+    };
+    await logActivity({ url, ...decision });
+    setCachedDecision(url, decision);
+    return decision;
   }
 
-  /* 9️⃣ DEFAULT ALLOW */
+  /* DEFAULT ALLOW */
   const decision = {
     verdict: "allow",
     riskScore: keywordResult.score || 0,
-    reasons: keywordResult.reasons || []
+    reasons: keywordResult.reasons || [],
+    stage: "DEFAULT_ALLOW"
   };
 
   await logActivity({ url, ...decision });
