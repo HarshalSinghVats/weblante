@@ -69,11 +69,12 @@ function isSearchPage(url) {
 
 async function logActivity({ url, verdict, riskScore, reasons }) {
   const now = Date.now();
+  const sessionKey = global.SESSION_ID || "default";
 
-  const prev = lastSeen.get("active");
+  const prev = lastSeen.get(sessionKey);
   const durationMs = prev ? now - prev.time : 0;
 
-  lastSeen.set("active", { time: now, url });
+  lastSeen.set(sessionKey, { time: now });
 
   await db.collection("activity").add({
     url,
@@ -118,7 +119,7 @@ export async function decideNavigation(input) {
       reasons: [adultDomainResult.reason]
     };
     await logActivity({ url, ...decision });
-    if (!isSearch) setCachedDecision(url, decision);
+    setCachedDecision(url, decision);
     return decision;
   }
 
@@ -130,7 +131,7 @@ export async function decideNavigation(input) {
       reasons: [safeResult.reason]
     };
     await logActivity({ url, ...decision });
-    if (!isSearch) setCachedDecision(url, decision);
+    setCachedDecision(url, decision);
     return decision;
   }
 
@@ -142,7 +143,7 @@ export async function decideNavigation(input) {
       reasons: [pathResult.reason]
     };
     await logActivity({ url, ...decision });
-    if (!isSearch) setCachedDecision(url, decision);
+    setCachedDecision(url, decision);
     return decision;
   }
 
@@ -165,7 +166,7 @@ export async function decideNavigation(input) {
       reasons: keywordResult.reasons
     };
     await logActivity({ url, ...decision });
-    if (!isSearch) setCachedDecision(url, decision);
+    setCachedDecision(url, decision);
     return decision;
   }
 
@@ -190,6 +191,6 @@ export async function decideNavigation(input) {
   };
 
   await logActivity({ url, ...decision });
-  if (!isSearch) setCachedDecision(url, decision);
+  setCachedDecision(url, decision);
   return decision;
 }
