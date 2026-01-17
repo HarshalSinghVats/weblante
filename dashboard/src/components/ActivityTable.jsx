@@ -4,9 +4,12 @@ import {
   query,
   orderBy,
   limit,
-  onSnapshot,
+  startAfter,
+  getDocs,
 } from "firebase/firestore";
 import { db } from "../firebase";
+
+const PAGE_SIZE = 10;
 
 function getDomain(url) {
   try {
@@ -27,22 +30,54 @@ function getFavicon(url) {
 
 export default function ActivityTable() {
   const [rows, setRows] = useState([]);
+  const [page, setPage] = useState(1);
+  const [cursors, setCursors] = useState([null]);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const q = query(
-      collection(db, "activity"),
-      orderBy("timestamp", "desc"),
-      limit(25)
-    );
-    const unsub = onSnapshot(q, (snap) => {
-      setRows(snap.docs.map((d) => d.data()));
-    });
-    return () => unsub();
+    loadPage(1);
   }, []);
 
+  const loadPage = async (pageNum) => {
+    setLoading(true);
+
+    const cursor = cursors[pageNum - 1] || null;
+
+    let q = query(
+      collection(db, "activity"),
+      orderBy("timestamp", "desc"),
+      limit(PAGE_SIZE)
+    );
+
+    if (cursor) {
+      q = query(
+        collection(db, "activity"),
+        orderBy("timestamp", "desc"),
+        startAfter(cursor),
+        limit(PAGE_SIZE)
+      );
+    }
+
+    const snap = await getDocs(q);
+    const docs = snap.docs;
+
+    setRows(docs.map((d) => d.data()));
+
+    if (docs.length === PAGE_SIZE && !cursors[pageNum]) {
+      setCursors((prev) => {
+        const copy = [...prev];
+        copy[pageNum] = docs[docs.length - 1];
+        return copy;
+      });
+    }
+
+    setPage(pageNum);
+    setLoading(false);
+  };
+
   return (
-    <div className="rounded-2xl bg-white/10 backdrop-blur-xl border border-white/25 shadow">
-      <div className="p-4 border-b border-white/20 text-white font-medium">
+    <div className="rounded-2xl bg-white/10 backdrop-blur-xl border border-white/30 shadow">
+      <div className="p-4 border-b border-white/30 text-white font-semibold">
         Recent Activity
       </div>
 
@@ -57,22 +92,17 @@ export default function ActivityTable() {
               </span>
             </div>
 
-            <p className="text-xs text-white/80 break-all">
-              {r.url}
-            </p>
+            <p className="text-xs text-white/80 break-all">{r.url}</p>
 
             <div className="flex justify-between text-xs text-white">
-              <span>
-                Decision:{" "}
-                <span
-                  className={`font-semibold ${
-                    r.decision === "block"
-                      ? "text-red-400"
-                      : "text-green-400"
-                  }`}
-                >
-                  {r.decision.toUpperCase()}
-                </span>
+              <span
+                className={`font-semibold ${
+                  r.decision === "block"
+                    ? "text-red-400"
+                    : "text-green-400"
+                }`}
+              >
+                {r.decision.toUpperCase()}
               </span>
               <span>
                 Risk: {Math.round((r.riskScore || 0) * 100)}
@@ -80,7 +110,7 @@ export default function ActivityTable() {
             </div>
 
             <p className="text-xs text-white/80">
-              Time: {new Date(r.timestamp).toLocaleTimeString()}
+              {new Date(r.timestamp).toLocaleTimeString()}
             </p>
           </div>
         ))}
@@ -91,14 +121,14 @@ export default function ActivityTable() {
         <table className="w-full min-w-[720px] text-sm text-white">
           <thead className="bg-white/5">
             <tr>
-              <th className="p-3 text-left font-semibold">Site</th>
-              <th className="p-3 text-center border-l border-white/20">
+              <th className="p-3 text-left">Site</th>
+              <th className="p-3 text-center border-l border-white/30">
                 Decision
               </th>
-              <th className="p-3 text-center border-l border-white/20">
+              <th className="p-3 text-center border-l border-white/30">
                 Risk
               </th>
-              <th className="p-3 text-center border-l border-white/20">
+              <th className="p-3 text-center border-l border-white/30">
                 Time
               </th>
             </tr>
@@ -110,9 +140,12 @@ export default function ActivityTable() {
                 key={i}
                 className="border-t border-white/10 hover:bg-white/5"
               >
-                <td className="p-3 max-w-[420px]">
+                <td className="p-3">
                   <div className="flex gap-2">
-                    <img src={getFavicon(r.url)} className="w-4 h-4 mt-1" />
+                    <img
+                      src={getFavicon(r.url)}
+                      className="w-4 h-4 mt-1"
+                    />
                     <div>
                       <p className="font-semibold text-white">
                         {getDomain(r.url)}
@@ -145,6 +178,29 @@ export default function ActivityTable() {
             ))}
           </tbody>
         </table>
+      </div>
+
+      {/* FOOTER */}
+      <div className="p-4 grid grid-cols-3 items-center text-white">
+        <button
+          disabled={page === 1 || loading}
+          onClick={() => loadPage(page - 1)}
+          className="justify-self-start px-3 py-1 rounded bg-white/10 border border-white/30 disabled:opacity-40"
+        >
+          Prev
+        </button>
+
+        <span className="justify-self-center text-sm font-semibold">
+          Page {page}
+        </span>
+
+        <button
+          disabled={!cursors[page] || loading}
+          onClick={() => loadPage(page + 1)}
+          className="justify-self-end px-3 py-1 rounded bg-white/10 border border-white/30 disabled:opacity-40"
+        >
+          Next
+        </button>
       </div>
     </div>
   );
