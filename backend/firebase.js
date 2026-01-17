@@ -2,7 +2,7 @@ import admin from "firebase-admin";
 import fs from "fs";
 import path from "path";
 
-const serviceAccountPath = path.resolve("backend/firebaseKey.json");
+const serviceAccountPath = path.resolve("./firebaseKey.json");
 
 if (!fs.existsSync(serviceAccountPath)) {
   throw new Error("firebaseKey.json missing (not committed, good)");

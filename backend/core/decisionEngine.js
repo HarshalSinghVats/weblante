@@ -16,9 +16,32 @@ const KEYWORD_BLOCK_THRESHOLD = 0.6;
 
 const lastSeen = new Map();
 
-/* -----------------------
-   Universal search detection
------------------------ */
+// ─────────────────────────────
+// Social media age restriction
+// ─────────────────────────────
+const SOCIAL_MEDIA_DOMAINS = [
+  "instagram.com",
+  "facebook.com",
+  "snapchat.com",
+  "tiktok.com",
+  "x.com",
+  "twitter.com",
+  "reddit.com",
+  "tumblr.com"
+];
+
+function isSocialMedia(url) {
+  try {
+    const host = new URL(url).hostname;
+    return SOCIAL_MEDIA_DOMAINS.some(d => host.includes(d));
+  } catch {
+    return false;
+  }
+}
+
+// ─────────────────────────────
+// Search detection (universal)
+// ─────────────────────────────
 function isSearchPage(url) {
   try {
     const u = new URL(url);
@@ -50,6 +73,9 @@ function isSearchPage(url) {
   }
 }
 
+// ─────────────────────────────
+// Firebase logging
+// ─────────────────────────────
 async function logActivity({ url, verdict, riskScore, reasons }) {
   const now = Date.now();
 
@@ -68,9 +94,27 @@ async function logActivity({ url, verdict, riskScore, reasons }) {
   });
 }
 
+// ─────────────────────────────
+// Decision engine
+// ─────────────────────────────
 export async function decideNavigation(input) {
   const { url } = input;
   const isSearch = isSearchPage(url);
+
+  // AGE-BASED BLOCK (SESSION)
+  if (
+    typeof global.CHILD_AGE === "number" &&
+    global.CHILD_AGE < 13 &&
+    isSocialMedia(url)
+  ) {
+    const decision = {
+      verdict: "block",
+      riskScore: 0.9,
+      reasons: ["Blocked by age-based policy"]
+    };
+    await logActivity({ url, ...decision });
+    return decision;
+  }
 
   if (!isSearch) {
     const cached = getCachedDecision(url);
