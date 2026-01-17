@@ -9,35 +9,74 @@ import { scanTextSources } from "../analysis/scanTextSources.js";
 import { checkSafeBrowsing } from "../reputation/safeBrowsing.js";
 import { checkUrlPath } from "../heuristics/urlPath.js";
 
+import db from "../firebase.js";
+
 const SAFE_BROWSING_KEY = process.env.SAFE_BROWSING_KEY;
 const KEYWORD_BLOCK_THRESHOLD = 0.6;
 
+const lastSeen = new Map();
+
 /* -----------------------
-   Search detection
+   Universal search detection
 ----------------------- */
 function isSearchPage(url) {
   try {
     const u = new URL(url);
-    return (
-      (u.hostname.includes("google.") && u.pathname === "/search") ||
-      (u.hostname === "search.brave.com" && u.pathname === "/search")
-    );
+
+    const SEARCH_PARAMS = [
+      "q",
+      "query",
+      "search",
+      "search_query",
+      "text",
+      "k",
+      "keyword"
+    ];
+
+    for (const p of SEARCH_PARAMS) {
+      if (u.searchParams.get(p)) return true;
+    }
+
+    if (
+      u.hostname.includes("wikipedia.org") &&
+      u.pathname.startsWith("/wiki/")
+    ) {
+      return true;
+    }
+
+    return false;
   } catch {
     return false;
   }
+}
+
+async function logActivity({ url, verdict, riskScore, reasons }) {
+  const now = Date.now();
+
+  const prev = lastSeen.get("active");
+  const durationMs = prev ? now - prev.time : 0;
+
+  lastSeen.set("active", { time: now, url });
+
+  await db.collection("activity").add({
+    url,
+    decision: verdict,
+    reason: reasons.join(", "),
+    riskScore,
+    durationMs,
+    timestamp: now
+  });
 }
 
 export async function decideNavigation(input) {
   const { url } = input;
   const isSearch = isSearchPage(url);
 
-  /* 0. CACHE (skip for search pages) */
   if (!isSearch) {
     const cached = getCachedDecision(url);
     if (cached) return cached;
   }
 
-  /* 1. HARD BLOCK — Known adult domains */
   const adultDomainResult = checkAdultDomain(url);
   if (adultDomainResult.hit) {
     const decision = {
@@ -45,11 +84,11 @@ export async function decideNavigation(input) {
       riskScore: 1.0,
       reasons: [adultDomainResult.reason]
     };
+    await logActivity({ url, ...decision });
     if (!isSearch) setCachedDecision(url, decision);
     return decision;
   }
 
-  /* 2. HARD BLOCK — Safe Browsing */
   const safeResult = await checkSafeBrowsing(url, SAFE_BROWSING_KEY);
   if (safeResult.hit) {
     const decision = {
@@ -57,11 +96,11 @@ export async function decideNavigation(input) {
       riskScore: 1.0,
       reasons: [safeResult.reason]
     };
+    await logActivity({ url, ...decision });
     if (!isSearch) setCachedDecision(url, decision);
     return decision;
   }
 
-  /* 3. URL PATH HEURISTIC */
   const pathResult = checkUrlPath(url);
   if (pathResult.hit) {
     const decision = {
@@ -69,34 +108,34 @@ export async function decideNavigation(input) {
       riskScore: 0.7,
       reasons: [pathResult.reason]
     };
+    await logActivity({ url, ...decision });
     if (!isSearch) setCachedDecision(url, decision);
     return decision;
   }
 
-  /* 4. KEYWORD ANALYSIS */
   const keywordResult = scanTextSources(input);
 
-  // 🚨 HARD BLOCK — high-risk keywords (search or not)
   if (keywordResult.hardBlock === true) {
-    return {
+    const decision = {
       verdict: "block",
       riskScore: 1.0,
       reasons: keywordResult.reasons
     };
+    await logActivity({ url, ...decision });
+    return decision;
   }
 
-  // Threshold-based block
   if (keywordResult.score >= KEYWORD_BLOCK_THRESHOLD) {
     const decision = {
       verdict: "block",
       riskScore: keywordResult.score,
       reasons: keywordResult.reasons
     };
+    await logActivity({ url, ...decision });
     if (!isSearch) setCachedDecision(url, decision);
     return decision;
   }
 
-  /* 5. CONDITIONAL ALLOWLIST (NON-SEARCH ONLY) */
   if (!isSearch) {
     const allowResult = checkAllowlist(url);
     if (allowResult.hit) {
@@ -105,18 +144,19 @@ export async function decideNavigation(input) {
         riskScore: 0,
         reasons: [allowResult.reason]
       };
+      await logActivity({ url, ...decision });
       setCachedDecision(url, decision);
       return decision;
     }
   }
 
-  /* 6. DEFAULT ALLOW */
   const decision = {
     verdict: "allow",
     riskScore: keywordResult.score,
     reasons: keywordResult.reasons
   };
 
+  await logActivity({ url, ...decision });
   if (!isSearch) setCachedDecision(url, decision);
   return decision;
 }

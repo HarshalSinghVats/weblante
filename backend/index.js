@@ -7,7 +7,10 @@ const PORT = 3000;
 
 app.use(express.json());
 
-console.log("SB KEY:", process.env.SAFE_BROWSING_KEY ? "LOADED" : "MISSING");
+console.log(
+  "SB KEY:",
+  process.env.SAFE_BROWSING_KEY ? "LOADED" : "MISSING"
+);
 
 /**
  * POST /analyze
@@ -34,7 +37,6 @@ app.post("/analyze", async (req, res) => {
       body
     });
 
-    // ✅ ADD THIS
     console.log(
       `[DECISION] ${decision.verdict.toUpperCase()} — ${url}`,
       decision.reasons
@@ -50,7 +52,6 @@ app.post("/analyze", async (req, res) => {
     });
   }
 });
-
 
 app.listen(PORT, () => {
   console.log(`Weblante backend running on http://localhost:${PORT}`);
