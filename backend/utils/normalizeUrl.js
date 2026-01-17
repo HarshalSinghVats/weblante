@@ -1,3 +1,5 @@
+// normalizeUrl.js
+
 export function normalizeUrl(inputUrl) {
   try {
     const url = new URL(
@@ -5,31 +7,25 @@ export function normalizeUrl(inputUrl) {
     );
 
     let host = url.hostname.toLowerCase();
+    if (host.startsWith("www.")) host = host.slice(4);
 
-    if (host.startsWith("www.")) {
-      host = host.slice(4);
-    }
+    const pathname = url.pathname.toLowerCase();
 
-    // Search engines → keep only main query
     const isSearch =
-      (host.includes("google.") && url.pathname === "/search") ||
+      host.includes("google.") ||
       host === "search.brave.com" ||
       host.includes("bing.com");
 
+    // 🔒 SEARCH: preserve raw query (DO NOT decode / rewrite)
     if (isSearch) {
-      const q =
-        url.searchParams.get("q") ||
-        url.searchParams.get("query") ||
-        url.searchParams.get("search") ||
-        "";
-
-      return `https://${host}${url.pathname}?q=${encodeURIComponent(q)}`;
+      return `${host}${pathname}${url.search}`;
     }
 
-    // Non-search → strip tracking params
-    return `https://${host}${url.pathname}`;
+    // 🔒 NON-SEARCH: strip query params safely
+    return `${host}${pathname}`;
   } catch {
-    return inputUrl;
+    // never return null
+    return String(inputUrl || "").toLowerCase();
   }
 }
 
@@ -40,13 +36,9 @@ export function normalizeDomain(inputUrl) {
     );
 
     let host = url.hostname.toLowerCase();
-
-    if (host.startsWith("www.")) {
-      host = host.slice(4);
-    }
-
+    if (host.startsWith("www.")) host = host.slice(4);
     return host;
   } catch {
-    return null;
+    return String(inputUrl || "").toLowerCase();
   }
 }
