@@ -53,5 +53,5 @@ app.post("/analyze", async (req, res) => {
 
 
 app.listen(PORT, () => {
-  console.log(`SafeBrowse backend running on http://localhost:${PORT}`);
+  console.log(`Weblante backend running on http://localhost:${PORT}`);
 });
