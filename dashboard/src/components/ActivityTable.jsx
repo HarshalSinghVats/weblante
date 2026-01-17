@@ -75,6 +75,8 @@ export default function ActivityTable() {
     setLoading(false);
   };
 
+  let lastSession = null;
+
   return (
     <div className="rounded-2xl bg-white/10 backdrop-blur-xl border border-white/30 shadow">
       <div className="p-4 border-b border-white/30 text-white font-semibold">
@@ -83,37 +85,49 @@ export default function ActivityTable() {
 
       {/* MOBILE */}
       <div className="sm:hidden divide-y divide-white/10">
-        {rows.map((r, i) => (
-          <div key={i} className="p-4 space-y-2">
-            <div className="flex items-center gap-2">
-              <img src={getFavicon(r.url)} className="w-4 h-4" />
-              <span className="text-white font-semibold">
-                {getDomain(r.url)}
-              </span>
+        {rows.map((r, i) => {
+          const showSession =
+            r.sessionId && r.sessionId !== lastSession;
+          lastSession = r.sessionId;
+
+          return (
+            <div key={i} className="p-4 space-y-2">
+              {showSession && (
+                <div className="text-xs text-white/70 border-b border-white/20 pb-1">
+                  Session • Age {r.age ?? "?"}
+                </div>
+              )}
+
+              <div className="flex items-center gap-2">
+                <img src={getFavicon(r.url)} className="w-4 h-4" />
+                <span className="text-white font-semibold">
+                  {getDomain(r.url)}
+                </span>
+              </div>
+
+              <p className="text-xs text-white/80 break-all">{r.url}</p>
+
+              <div className="flex justify-between text-xs text-white">
+                <span
+                  className={`font-semibold ${
+                    r.decision === "block"
+                      ? "text-red-400"
+                      : "text-green-400"
+                  }`}
+                >
+                  {r.decision.toUpperCase()}
+                </span>
+                <span>
+                  Risk: {Math.round((r.riskScore || 0) * 100)}
+                </span>
+              </div>
+
+              <p className="text-xs text-white/80">
+                {new Date(r.timestamp).toLocaleTimeString()}
+              </p>
             </div>
-
-            <p className="text-xs text-white/80 break-all">{r.url}</p>
-
-            <div className="flex justify-between text-xs text-white">
-              <span
-                className={`font-semibold ${
-                  r.decision === "block"
-                    ? "text-red-400"
-                    : "text-green-400"
-                }`}
-              >
-                {r.decision.toUpperCase()}
-              </span>
-              <span>
-                Risk: {Math.round((r.riskScore || 0) * 100)}
-              </span>
-            </div>
-
-            <p className="text-xs text-white/80">
-              {new Date(r.timestamp).toLocaleTimeString()}
-            </p>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* DESKTOP */}
@@ -121,66 +135,86 @@ export default function ActivityTable() {
         <table className="w-full min-w-[720px] text-sm text-white">
           <thead className="bg-white/5">
             <tr>
-              <th className="p-3 text-left">Site</th>
-              <th className="p-3 text-center border-l border-white/30">
+              <th className="p-3 text-left font-semibold text-white">
+                Site
+              </th>
+              <th className="p-3 text-center border-l border-white/30 text-white">
                 Decision
               </th>
-              <th className="p-3 text-center border-l border-white/30">
+              <th className="p-3 text-center border-l border-white/30 text-white">
                 Risk
               </th>
-              <th className="p-3 text-center border-l border-white/30">
+              <th className="p-3 text-center border-l border-white/30 text-white">
                 Time
               </th>
             </tr>
           </thead>
 
           <tbody>
-            {rows.map((r, i) => (
-              <tr
-                key={i}
-                className="border-t border-white/10 hover:bg-white/5"
-              >
-                <td className="p-3">
-                  <div className="flex gap-2">
-                    <img
-                      src={getFavicon(r.url)}
-                      className="w-4 h-4 mt-1"
-                    />
-                    <div>
-                      <p className="font-semibold text-white">
-                        {getDomain(r.url)}
-                      </p>
-                      <p className="text-xs text-white/70 break-all">
-                        {r.url}
-                      </p>
-                    </div>
-                  </div>
-                </td>
+            {rows.map((r, i) => {
+              const showSession =
+                r.sessionId && r.sessionId !== lastSession;
+              lastSession = r.sessionId;
 
-                <td
-                  className={`p-3 text-center font-semibold border-l border-white/10 ${
-                    r.decision === "block"
-                      ? "text-red-400"
-                      : "text-green-400"
-                  }`}
-                >
-                  {r.decision.toUpperCase()}
-                </td>
+              return (
+                <>
+                  {showSession && (
+                    <tr>
+                      <td
+                        colSpan={4}
+                        className="p-2 text-xs text-white/70 bg-white/5"
+                      >
+                        Session • Age {r.age ?? "?"}
+                      </td>
+                    </tr>
+                  )}
 
-                <td className="p-3 text-center border-l border-white/10">
-                  {Math.round((r.riskScore || 0) * 100)}
-                </td>
+                  <tr
+                    key={i}
+                    className="border-t border-white/10 hover:bg-white/5"
+                  >
+                    <td className="p-3">
+                      <div className="flex gap-2">
+                        <img
+                          src={getFavicon(r.url)}
+                          className="w-4 h-4 mt-1"
+                        />
+                        <div>
+                          <p className="font-semibold text-white">
+                            {getDomain(r.url)}
+                          </p>
+                          <p className="text-xs text-white/70 break-all">
+                            {r.url}
+                          </p>
+                        </div>
+                      </div>
+                    </td>
 
-                <td className="p-3 text-center border-l border-white/10 text-white/80">
-                  {new Date(r.timestamp).toLocaleTimeString()}
-                </td>
-              </tr>
-            ))}
+                    <td
+                      className={`p-3 text-center font-semibold border-l border-white/10 ${
+                        r.decision === "block"
+                          ? "text-red-400"
+                          : "text-green-400"
+                      }`}
+                    >
+                      {r.decision.toUpperCase()}
+                    </td>
+
+                    <td className="p-3 text-center border-l border-white/10">
+                      {Math.round((r.riskScore || 0) * 100)}
+                    </td>
+
+                    <td className="p-3 text-center border-l border-white/10 text-white/80">
+                      {new Date(r.timestamp).toLocaleTimeString()}
+                    </td>
+                  </tr>
+                </>
+              );
+            })}
           </tbody>
         </table>
       </div>
 
-      {/* FOOTER */}
       <div className="p-4 grid grid-cols-3 items-center text-white">
         <button
           disabled={page === 1 || loading}
