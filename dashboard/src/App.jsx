@@ -1,35 +1,89 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import { useEffect, useState } from "react";
+import { auth } from "./firebase";
+import {
+  RecaptchaVerifier,
+  signInWithPhoneNumber,
+} from "firebase/auth";
+import Dashboard from "./pages/Dashboard";
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [phone, setPhone] = useState("");
+  const [code, setCode] = useState("");
+  const [confirmResult, setConfirmResult] = useState(null);
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    auth.onAuthStateChanged((u) => setUser(u));
+
+    if (!window.recaptchaVerifier) {
+      window.recaptchaVerifier = new RecaptchaVerifier(
+        auth,
+        "recaptcha-container",
+        { size: "invisible" }
+      );
+    }
+  }, []);
+
+  const sendCode = async () => {
+    const res = await signInWithPhoneNumber(
+      auth,
+      phone,
+      window.recaptchaVerifier
+    );
+    setConfirmResult(res);
+  };
+
+  const verifyCode = async () => {
+    await confirmResult.confirm(code);
+  };
+
+  if (user) {
+    return <Dashboard />;
+  }
 
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="bg-white p-8 rounded-lg shadow w-full max-w-sm">
+        <h2 className="text-xl font-semibold mb-6">
+          Parent Login
+        </h2>
+
+        <input
+          className="w-full border rounded px-3 py-2 mb-3"
+          placeholder="+16505553434"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+        />
+
+        <button
+          className="w-full bg-black text-white py-2 rounded mb-4"
+          onClick={sendCode}
+        >
+          Send Code
         </button>
-        <p>
-          Edit <code>src/App.jsx</code> and save to test HMR
-        </p>
+
+        {confirmResult && (
+          <>
+            <input
+              className="w-full border rounded px-3 py-2 mb-3"
+              placeholder="123456"
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+            />
+
+            <button
+              className="w-full bg-green-600 text-white py-2 rounded"
+              onClick={verifyCode}
+            >
+              Verify
+            </button>
+          </>
+        )}
+
+        <div id="recaptcha-container"></div>
       </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+    </div>
+  );
 }
 
-export default App
+export default App;
