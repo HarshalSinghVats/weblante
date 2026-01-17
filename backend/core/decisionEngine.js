@@ -17,7 +17,9 @@ import fetch from "node-fetch";
 import db from "../firebase.js";
 
 const SAFE_BROWSING_KEY = process.env.SAFE_BROWSING_KEY;
+
 const lastSeen = new Map();
+const recentLogs = new Map();
 
 /* ---------------- CONSTANTS ---------------- */
 
@@ -114,7 +116,7 @@ function resolveAgePolicy(age) {
   return null;
 }
 
-/* ---------------- LOGGING ---------------- */
+/* ---------------- LOGGING (DEDUPED) ---------------- */
 
 async function logActivity({
   url,
@@ -125,6 +127,14 @@ async function logActivity({
 }) {
   const now = Date.now();
   const sessionKey = global.SESSION_ID || "default";
+
+  const dedupeKey = `${sessionKey}:${verdict}:${url}`;
+  const last = recentLogs.get(dedupeKey);
+
+  if (last && now - last < 2000) {
+    return;
+  }
+  recentLogs.set(dedupeKey, now);
 
   const prev = lastSeen.get(sessionKey);
   const durationMs = prev ? now - prev.time : 0;
@@ -141,7 +151,7 @@ async function logActivity({
     timestamp: now,
     age: global.CHILD_AGE ?? null,
     ageClass: global.AGE_CLASS ?? null,
-    sessionId: global.SESSION_ID ?? null
+    sessionId: sessionKey
   });
 }
 
@@ -162,7 +172,6 @@ export async function decideNavigation(input) {
 
   if (agePolicy) global.AGE_CLASS = agePolicy.class;
 
-  /* 🚫 ABSOLUTE EXPLICIT SEARCH */
   if (
     isSearch &&
     /s[\W_]*x|sex|porn|xxx|xvideos|xnxx|hentai|nude|blowjob|fuck/i.test(searchQuery)
@@ -177,7 +186,6 @@ export async function decideNavigation(input) {
     return decision;
   }
 
-  /* AGE-BASED SOCIAL MEDIA */
   if (agePolicy && global.CHILD_AGE < 16 && isSocialMedia(url)) {
     const decision = {
       verdict: "block",
@@ -189,7 +197,6 @@ export async function decideNavigation(input) {
     return decision;
   }
 
-  /* ADULT DOMAIN */
   const adultDomainResult = checkAdultDomain(url);
   if (adultDomainResult.hit) {
     const decision = {
@@ -202,7 +209,6 @@ export async function decideNavigation(input) {
     return decision;
   }
 
-  /* SAFE BROWSING */
   const safeResult = await checkSafeBrowsing(url, SAFE_BROWSING_KEY);
   if (safeResult.hit) {
     const decision = {
@@ -215,7 +221,6 @@ export async function decideNavigation(input) {
     return decision;
   }
 
-  /* KEYWORD ANALYSIS */
   const keywordResult = isSearch
     ? scanTextSources({ body: searchQuery })
     : scanTextSources(input);
@@ -242,7 +247,6 @@ export async function decideNavigation(input) {
     return decision;
   }
 
-  /* FUZZY */
   if (isSearch && fuzzyCheck(searchQuery)) {
     const decision = {
       verdict: "block",
@@ -254,12 +258,7 @@ export async function decideNavigation(input) {
     return decision;
   }
 
-  /* GEMINI */
-  if (
-    isSearch &&
-    agePolicy &&
-    searchQuery.length > 3
-  ) {
+  if (isSearch && agePolicy && searchQuery.length > 3) {
     const verdict = await geminiCheck(searchQuery, agePolicy.class);
     if (verdict === "UNSAFE") {
       const decision = {
@@ -273,7 +272,6 @@ export async function decideNavigation(input) {
     }
   }
 
-  /* ALLOWLIST */
   const allowResult = checkAllowlist(url);
   if (allowResult.hit) {
     const decision = {
@@ -287,7 +285,6 @@ export async function decideNavigation(input) {
     return decision;
   }
 
-  /* DEFAULT ALLOW */
   const decision = {
     verdict: "allow",
     riskScore: keywordResult.score || 0,
