@@ -8,7 +8,7 @@ import {
   getDocs,
 } from "firebase/firestore";
 import { db } from "../firebase";
-//shows number of logs in a page
+
 const PAGE_SIZE = 10;
 
 function getDomain(url) {
@@ -24,7 +24,7 @@ function getFavicon(url) {
     const d = new URL(url).hostname;
     return `https://www.google.com/s2/favicons?sz=64&domain=${d}`;
   } catch {
-    return "";
+    return "/weblante-logo.png";
   }
 }
 
@@ -46,7 +46,7 @@ export default function ActivityTable() {
     let q = query(
       collection(db, "activity"),
       orderBy("timestamp", "desc"),
-      limit(PAGE_SIZE)
+      limit(PAGE_SIZE),
     );
 
     if (cursor) {
@@ -54,7 +54,7 @@ export default function ActivityTable() {
         collection(db, "activity"),
         orderBy("timestamp", "desc"),
         startAfter(cursor),
-        limit(PAGE_SIZE)
+        limit(PAGE_SIZE),
       );
     }
 
@@ -86,8 +86,7 @@ export default function ActivityTable() {
       {/* MOBILE */}
       <div className="sm:hidden divide-y divide-white/10">
         {rows.map((r, i) => {
-          const showSession =
-            r.sessionId && r.sessionId !== lastSession;
+          const showSession = r.sessionId && r.sessionId !== lastSession;
           lastSession = r.sessionId;
 
           return (
@@ -99,7 +98,13 @@ export default function ActivityTable() {
               )}
 
               <div className="flex items-center gap-2">
-                <img src={getFavicon(r.url)} className="w-4 h-4" />
+                <img
+                  src={getFavicon(r.url)}
+                  onError={(e) => {
+                    e.currentTarget.src = "/weblante-logo.png";
+                  }}
+                  className="w-4 h-4 mt-1"
+                />
                 <span className="text-white font-semibold">
                   {getDomain(r.url)}
                 </span>
@@ -107,25 +112,15 @@ export default function ActivityTable() {
 
               <p className="text-xs text-white/80 break-all">{r.url}</p>
 
-              {r.decision === "block" && r.primaryReason && (
-                <p className="text-xs text-red-400 font-semibold">
-                  {r.primaryReason}
-                </p>
-              )}
-
               <div className="flex justify-between text-xs text-white">
                 <span
                   className={`font-semibold ${
-                    r.decision === "block"
-                      ? "text-red-400"
-                      : "text-green-400"
+                    r.decision === "block" ? "text-red-400" : "text-green-400"
                   }`}
                 >
                   {r.decision.toUpperCase()}
                 </span>
-                <span>
-                  Risk: {Math.round((r.riskScore || 0) * 100)}
-                </span>
+                <span>Risk: {Math.round((r.riskScore || 0) * 100)}</span>
               </div>
 
               <p className="text-xs text-white/80">
@@ -141,25 +136,18 @@ export default function ActivityTable() {
         <table className="w-full min-w-[720px] text-sm text-white">
           <thead className="bg-white/5">
             <tr>
-              <th className="p-3 text-left font-semibold text-white">
-                Site
-              </th>
-              <th className="p-3 text-center border-l border-white/30 text-white">
+              <th className="p-3 text-left font-semibold">Site</th>
+              <th className="p-3 text-center border-l border-white/30">
                 Decision
               </th>
-              <th className="p-3 text-center border-l border-white/30 text-white">
-                Risk
-              </th>
-              <th className="p-3 text-center border-l border-white/30 text-white">
-                Time
-              </th>
+              <th className="p-3 text-center border-l border-white/30">Risk</th>
+              <th className="p-3 text-center border-l border-white/30">Time</th>
             </tr>
           </thead>
 
           <tbody>
             {rows.map((r, i) => {
-              const showSession =
-                r.sessionId && r.sessionId !== lastSession;
+              const showSession = r.sessionId && r.sessionId !== lastSession;
               lastSession = r.sessionId;
 
               return (
@@ -183,21 +171,17 @@ export default function ActivityTable() {
                       <div className="flex gap-2">
                         <img
                           src={getFavicon(r.url)}
+                          onError={(e) => {
+                            e.currentTarget.onerror = null;
+                            e.currentTarget.src = "/weblante-logo.png";
+                          }}
                           className="w-4 h-4 mt-1"
                         />
                         <div>
-                          <p className="font-semibold text-white">
-                            {getDomain(r.url)}
-                          </p>
+                          <p className="font-semibold">{getDomain(r.url)}</p>
                           <p className="text-xs text-white/70 break-all">
                             {r.url}
                           </p>
-
-                          {r.decision === "block" && r.primaryReason && (
-                            <p className="text-xs text-red-400 font-semibold mt-1">
-                              {r.primaryReason}
-                            </p>
-                          )}
                         </div>
                       </div>
                     </td>
@@ -231,7 +215,7 @@ export default function ActivityTable() {
         <button
           disabled={page === 1 || loading}
           onClick={() => loadPage(page - 1)}
-          className="justify-self-start px-3 py-1 rounded bg-white/10 border border-white/30 disabled:opacity-40"
+          className="justify-self-start px-3 py-1 rounded bg-white/10 cursor-pointer border border-white/30 disabled:opacity-40"
         >
           Prev
         </button>
@@ -243,7 +227,7 @@ export default function ActivityTable() {
         <button
           disabled={!cursors[page] || loading}
           onClick={() => loadPage(page + 1)}
-          className="justify-self-end px-3 py-1 rounded bg-white/10 border border-white/30 disabled:opacity-40"
+          className="justify-self-end px-3 py-1 rounded bg-white/10 cursor-pointer border border-white/30 disabled:opacity-40"
         >
           Next
         </button>

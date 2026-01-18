@@ -17,15 +17,9 @@ function formatTime(ms) {
   return `${pad(h)} hrs ${pad(m)} min ${pad(sec)} sec`;
 }
 
-function getWellbeingAdvice(timeMs, blockedCount) {
+/* Screen-time wellbeing */
+function getScreenTimeAdvice(timeMs) {
   const hours = timeMs / (1000 * 60 * 60);
-
-  if (blockedCount >= 3) {
-    return {
-      text: "Repeated blocked attempts detected. Consider discussing safe browsing habits.",
-      color: "text-red-400",
-    };
-  }
 
   if (hours > 3) {
     return {
@@ -43,13 +37,42 @@ function getWellbeingAdvice(timeMs, blockedCount) {
 
   if (hours > 1) {
     return {
-      text: "Moderate screen time. Encourage breaks and offline activity.",
+      text: "Moderate screen time. Encourage regular breaks.",
       color: "text-yellow-300",
     };
   }
 
   return {
-    text: "All good. Healthy usage today. Check again later.",
+    text: "Healthy screen time usage today.",
+    color: "text-green-400",
+  };
+}
+
+/* Block-based wellbeing */
+function getBlockBasedAdvice(blockedCount) {
+  if (blockedCount >= 5) {
+    return {
+      text: "Frequent blocked attempts detected. Consider discussing safe browsing habits.",
+      color: "text-red-400",
+    };
+  }
+
+  if (blockedCount >= 3) {
+    return {
+      text: "Multiple blocked attempts observed. Monitor browsing behavior.",
+      color: "text-yellow-300",
+    };
+  }
+
+  if (blockedCount >= 1) {
+    return {
+      text: "Occasional unsafe attempts blocked. System is working as expected.",
+      color: "text-yellow-300",
+    };
+  }
+
+  return {
+    text: "No unsafe browsing attempts detected.",
     color: "text-green-400",
   };
 }
@@ -61,21 +84,27 @@ export default function SummaryCards() {
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "activity"), (snap) => {
-      let a = 0, b = 0, t = 0;
+      let a = 0,
+        b = 0,
+        t = 0;
+
       snap.forEach((d) => {
         const x = d.data();
         if (x.decision === "allow") a++;
         if (x.decision === "block") b++;
         t += x.durationMs || 0;
       });
+
       setAllowed(a);
       setBlocked(b);
       setTime(t);
     });
+
     return () => unsub();
   }, []);
 
-  const advice = getWellbeingAdvice(time, blocked);
+  const screenAdvice = getScreenTimeAdvice(time);
+  const blockAdvice = getBlockBasedAdvice(blocked);
 
   const chartData = {
     datasets: [
@@ -104,19 +133,22 @@ export default function SummaryCards() {
         </div>
       </div>
 
-      {/* Screen Time */}
+      {/* Screen Time + Time Wellbeing */}
       <div className="rounded-2xl bg-white/10 backdrop-blur-xl border border-white/25 p-4 shadow">
         <p className="text-xs text-white/70">Screen Time (Today)</p>
         <p className="text-white font-semibold mt-1">
           {formatTime(time)}
         </p>
+        <p className={`text-sm mt-2 font-medium ${screenAdvice.color}`}>
+          {screenAdvice.text}
+        </p>
       </div>
 
-      {/* Wellbeing Advice */}
+      {/* Wellbeing Advice (Block-based) */}
       <div className="rounded-2xl bg-white/10 backdrop-blur-xl border border-white/25 p-4 shadow">
         <p className="text-xs text-white/70">Wellbeing Advice</p>
-        <p className={`text-sm mt-2 font-medium ${advice.color}`}>
-          {advice.text}
+        <p className={`text-sm mt-2 font-medium ${blockAdvice.color}`}>
+          {blockAdvice.text}
         </p>
       </div>
     </div>
