@@ -102,7 +102,7 @@ function extractSearchQuery(rawUrl) {
       const v = u.searchParams.get(p);
       if (v) return safeDecode(v).trim();
     }
-  } catch {}
+  } catch { }
 
   return "";
 }
@@ -155,23 +155,24 @@ async function logActivity({
   });
 }
 
+
+
 /* ================= MAIN ENGINE ================= */
 
 export async function decideNavigation(input) {
-
   const rawUrl = input.url;
   const url = truncateUrlForDecision(rawUrl);
 
   const searchQuery = extractSearchQuery(rawUrl);
   const isSearch = searchQuery.length > 0;
 
+  // ✅ AGE POLICY — COMPUTE ONCE
   const agePolicy =
     typeof global.CHILD_AGE === "number"
       ? resolveAgePolicy(global.CHILD_AGE)
       : null;
 
-  if (agePolicy) global.AGE_CLASS = agePolicy.class;
-
+  // 1️⃣ EXPLICIT SEARCH (FAST PATH)
   if (
     isSearch &&
     /s[\W_]*x|sex|porn|xxx|xvideos|xnxx|hentai|nude|blowjob|fuck/i.test(searchQuery)
@@ -186,6 +187,7 @@ export async function decideNavigation(input) {
     return decision;
   }
 
+  // 2️⃣ AGE-BASED SOCIAL MEDIA BLOCK
   if (agePolicy && global.CHILD_AGE < 16 && isSocialMedia(url)) {
     const decision = {
       verdict: "block",
@@ -197,6 +199,7 @@ export async function decideNavigation(input) {
     return decision;
   }
 
+  // 3️⃣ ADULT DOMAIN
   const adultDomainResult = checkAdultDomain(url);
   if (adultDomainResult.hit) {
     const decision = {
@@ -209,6 +212,7 @@ export async function decideNavigation(input) {
     return decision;
   }
 
+  // 4️⃣ SAFE BROWSING
   const safeResult = await checkSafeBrowsing(url, SAFE_BROWSING_KEY);
   if (safeResult.hit) {
     const decision = {
@@ -221,6 +225,7 @@ export async function decideNavigation(input) {
     return decision;
   }
 
+  // 5️⃣ KEYWORD ANALYSIS
   const keywordResult = isSearch
     ? scanTextSources({ body: searchQuery })
     : scanTextSources(input);
@@ -247,6 +252,7 @@ export async function decideNavigation(input) {
     return decision;
   }
 
+  // 6️⃣ FUZZY CHECK
   if (isSearch && fuzzyCheck(searchQuery)) {
     const decision = {
       verdict: "block",
@@ -258,6 +264,7 @@ export async function decideNavigation(input) {
     return decision;
   }
 
+  // 7️⃣ GEMINI — LAST RESORT
   if (isSearch && agePolicy && searchQuery.length > 3) {
     const verdict = await geminiCheck(searchQuery, agePolicy.class);
     if (verdict === "UNSAFE") {
@@ -272,6 +279,7 @@ export async function decideNavigation(input) {
     }
   }
 
+  // 8️⃣ ALLOWLIST
   const allowResult = checkAllowlist(url);
   if (allowResult.hit) {
     const decision = {
@@ -285,6 +293,7 @@ export async function decideNavigation(input) {
     return decision;
   }
 
+  // 9️⃣ DEFAULT ALLOW
   const decision = {
     verdict: "allow",
     riskScore: keywordResult.score || 0,

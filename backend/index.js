@@ -3,6 +3,7 @@ import express from "express";
 import readline from "readline";
 import crypto from "crypto";
 import { decideNavigation } from "./core/decisionEngine.js";
+import { resolveAgePolicy } from "./core/agePolicy.js"; // ✅ ADD THIS
 
 const app = express();
 const PORT = 3000;
@@ -18,6 +19,7 @@ console.log(
 // Session globals
 // ─────────────────────────────
 global.CHILD_AGE = null;
+global.AGE_CLASS = null;              // ✅ ENSURE DEFINED
 global.SESSION_ID = crypto.randomUUID();
 global.LAST_SEARCH_QUERY = null;
 
@@ -50,7 +52,6 @@ function formatUrlForLog(rawUrl) {
       return `${host}${path}?q=${decoded}`;
     }
 
-    // No query in URL → show last known search if exists
     if (global.LAST_SEARCH_QUERY) {
       return `${host}${path} (last search: ${global.LAST_SEARCH_QUERY})`;
     }
@@ -73,7 +74,14 @@ rl.question("Enter child's age for this session: ", (answer) => {
   const age = Number(answer);
   global.CHILD_AGE = isNaN(age) ? null : age;
 
+  // ✅ SET AGE CLASS ONCE
+  const agePolicy = resolveAgePolicy(global.CHILD_AGE);
+  if (agePolicy) {
+    global.AGE_CLASS = agePolicy.class;
+  }
+
   console.log("Session age set to:", global.CHILD_AGE);
+  console.log("Age class:", global.AGE_CLASS);
   console.log("Session ID:", global.SESSION_ID);
 
   rl.close();
@@ -116,3 +124,4 @@ app.post("/analyze", async (req, res) => {
     });
   }
 });
+  
