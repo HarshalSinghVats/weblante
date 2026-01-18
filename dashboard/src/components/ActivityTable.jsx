@@ -46,7 +46,7 @@ export default function ActivityTable() {
     let q = query(
       collection(db, "activity"),
       orderBy("timestamp", "desc"),
-      limit(PAGE_SIZE),
+      limit(PAGE_SIZE)
     );
 
     if (cursor) {
@@ -54,7 +54,7 @@ export default function ActivityTable() {
         collection(db, "activity"),
         orderBy("timestamp", "desc"),
         startAfter(cursor),
-        limit(PAGE_SIZE),
+        limit(PAGE_SIZE)
       );
     }
 
@@ -112,15 +112,26 @@ export default function ActivityTable() {
 
               <p className="text-xs text-white/80 break-all">{r.url}</p>
 
+              {r.decision === "block" &&
+                (r.primaryReason || r.reasons?.[0]) && (
+                  <p className="text-xs text-red-400 font-semibold">
+                    {r.primaryReason || r.reasons[0]}
+                  </p>
+                )}
+
               <div className="flex justify-between text-xs text-white">
                 <span
                   className={`font-semibold ${
-                    r.decision === "block" ? "text-red-400" : "text-green-400"
+                    r.decision === "block"
+                      ? "text-red-400"
+                      : "text-green-400"
                   }`}
                 >
                   {r.decision.toUpperCase()}
                 </span>
-                <span>Risk: {Math.round((r.riskScore || 0) * 100)}</span>
+                <span>
+                  Risk: {Math.round((r.riskScore || 0) * 100)}
+                </span>
               </div>
 
               <p className="text-xs text-white/80">
@@ -140,8 +151,12 @@ export default function ActivityTable() {
               <th className="p-3 text-center border-l border-white/30">
                 Decision
               </th>
-              <th className="p-3 text-center border-l border-white/30">Risk</th>
-              <th className="p-3 text-center border-l border-white/30">Time</th>
+              <th className="p-3 text-center border-l border-white/30">
+                Risk
+              </th>
+              <th className="p-3 text-center border-l border-white/30">
+                Time
+              </th>
             </tr>
           </thead>
 
@@ -178,10 +193,19 @@ export default function ActivityTable() {
                           className="w-4 h-4 mt-1"
                         />
                         <div>
-                          <p className="font-semibold">{getDomain(r.url)}</p>
+                          <p className="font-semibold">
+                            {getDomain(r.url)}
+                          </p>
                           <p className="text-xs text-white/70 break-all">
                             {r.url}
                           </p>
+
+                          {r.decision === "block" &&
+                            (r.primaryReason || r.reasons?.[0]) && (
+                              <p className="text-xs text-red-400 font-semibold mt-1">
+                                {r.primaryReason || r.reasons[0]}
+                              </p>
+                            )}
                         </div>
                       </div>
                     </td>
